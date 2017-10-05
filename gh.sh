@@ -9,6 +9,11 @@ function force_push() {
 	git push origin $1 --force
 }
 
+function force_pull() {
+    pull $1
+    git reset --hard "origin/$1"
+}
+
 function pull() {
     output "Pulling..."
 	git pull origin $1
@@ -217,6 +222,7 @@ function show_usage() {
     output "\033[1;31md \033[0m - push"
     output "\033[1;31mf \033[0m - force push"
     output "\033[1;31mp \033[0m - pull"
+    output "\033[1;31mo \033[0m - force pull"
     output "\033[1;31mc \033[0m - commit"
     output "\033[1;31ma \033[0m - amend commit"
     output "\033[1;31ms \033[0m - smart commit"
@@ -250,6 +256,9 @@ case ${answer} in
 		;;
 	p|P)
 		pull $(get_current_branch)
+		;;
+	o|O)
+	    force_pull $(get_current_branch)
 		;;
 	c|C)
 		# turn on user input
