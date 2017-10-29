@@ -1,15 +1,16 @@
-# git-helper
+# casual-git
 
 ## How to install
-1. `git clone https://github.com/x0st/git-helper`
-2. Put the path to folder _/any/path/git-helper/bin_ to $PATH variable.
-3. Use within git repositories `gh` to open git-helper
+1. `git clone https://github.com/x0st/casual-git`
+2. `make`
+3. Use `gh` within git repositories to open casual-git
 
 ## Docs
 ```
   d  - push
   f  - force push
   p  - pull
+  o  - force pull
   c  - commit
   a  - amend commit
   s  - smart commit
@@ -26,6 +27,12 @@
 ### p
 `git pull origin {current_branch}`
 
+### o
+```
+git pull origin {current_branch}
+git reset --hard "origin/{current_branch}"
+```
+
 ### c
 You will be asked about a message.
 
@@ -39,6 +46,7 @@ You will be asked about a message.
   d  - push
   f  - force push
   p  - pull
+  o  - force pull
   c  - commit
   a  - amend commit
   s  - smart commit
@@ -69,6 +77,7 @@ git log --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s 
   d  - push
   f  - force push
   p  - pull
+  o  - force pull
   c  - commit
   a  - amend commit
   s  - smart commit
@@ -91,7 +100,3 @@ git log --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s 
   
 Switched to branch 'feature/EGNYTE-20-watermarks-over-documents'
 ```
-
-1. If there is a branch with a specified name then it will be switched.
-2. If there are more than one branch with a specified name then 10 first branches will be shown to the user. User has to click only one button - number in the list.
-3. No such a branch. User will be prompted to enter a name again. 
