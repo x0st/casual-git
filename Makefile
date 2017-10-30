@@ -1,12 +1,10 @@
 PREFIX=/usr/local
 NAME=gh
+PWD=$(shell pwd)
 
 install: uninstall
-	cp gh.sh $(NAME)
-	chmod +x $(NAME)
 	mkdir -p $(PREFIX)/bin
-	install $(NAME) $(PREFIX)/bin/
-	rm -f $(NAME)
+	ln -s $(PWD)/gh.sh $(PREFIX)/bin/$(NAME)
 
 uninstall:
 	rm -f $(PREFIX)/bin/$(NAME)
