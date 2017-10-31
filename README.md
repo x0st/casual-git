@@ -2,8 +2,9 @@
 
 ## How to install
 1. `git clone https://github.com/x0st/casual-git`
-2. `make`
-3. Use `gh` within git repositories to open casual-git
+2. `cd casual-git`
+3. `make`
+4. Use `gh` within git repositories to open the `casual-git`
 
 ## Docs
 ```
