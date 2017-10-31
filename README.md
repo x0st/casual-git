@@ -9,50 +9,50 @@
 ## Docs
 ```
   d  - push
-  f  - force push
+  f  - push --force
   p  - pull
-  o  - force pull
+  o  - pull --force
   c  - commit
-  a  - amend commit
-  s  - smart commit
-  l  - pretty log
-  h  - smart checkout
+  a  - commit --amend
+  s  - commit --smart
+  l  - log --pretty
+  h  - checkout --smart
 ```
 
-### d
+### d (push)
 `git push origin {current_branch}`
 
-### f
+### f (push --force)
 `git push origin {current_branch} --force`
 
-### p
+### p (pull)
 `git pull origin {current_branch}`
 
-### o
+### o (pull --force)
 ```
 git pull origin {current_branch}
 git reset --hard "origin/{current_branch}"
 ```
 
-### c
+### c (commit)
 You will be asked about a message.
 
 `git commit -m "{message}"`
 
-### a
+### a (commit --amend)
 `git commit --amend --no-edit`
 
-### s
+### s (commit --smart)
 ```
   d  - push
-  f  - force push
+  f  - push --force
   p  - pull
-  o  - force pull
+  o  - pull --force
   c  - commit
-  a  - amend commit
-  s  - smart commit
-  l  - pretty log
-  h  - smart checkout
+  a  - commit --amend
+  s  - commit --smart
+  l  - log --pretty
+  h  - checkout --smart
   
   Delete files from the next commit: 
   [-1] new file: test1
@@ -67,23 +67,22 @@ You will be asked about a message.
   Enter a comment: my commit
 ```
 
-### l
+### l (log --pretty)
 ```
 git log --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit
 ```
 
-### h
+### h (checkout --smart)
 ```
-  
   d  - push
-  f  - force push
+  f  - push --force
   p  - pull
-  o  - force pull
+  o  - pull --force
   c  - commit
-  a  - amend commit
-  s  - smart commit
-  l  - pretty log
-  h  - smart checkout
+  a  - commit --amend
+  s  - commit --smart
+  l  - log --pretty
+  h  - checkout --smart
   
   Enter a branch name or a part of name: ma
   
