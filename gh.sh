@@ -220,14 +220,14 @@ function output() {
 function show_usage() {
     output
     output "\033[1;31md \033[0m - push"
-    output "\033[1;31mf \033[0m - force push"
+    output "\033[1;31mf \033[0m - push --force"
     output "\033[1;31mp \033[0m - pull"
-    output "\033[1;31mo \033[0m - force pull"
+    output "\033[1;31mo \033[0m - pull --force"
     output "\033[1;31mc \033[0m - commit"
-    output "\033[1;31ma \033[0m - amend commit"
-    output "\033[1;31ms \033[0m - smart commit"
-    output "\033[1;31ml \033[0m - pretty log"
-    output "\033[1;31mh \033[0m - smart checkout"
+    output "\033[1;31ma \033[0m - commit --amend"
+    output "\033[1;31ms \033[0m - commit --smart"
+    output "\033[1;31ml \033[0m - log --pretty"
+    output "\033[1;31mh \033[0m - checkout --smart"
     output
 }
 
