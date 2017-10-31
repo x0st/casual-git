@@ -6,12 +6,28 @@ function git_push() {
 }
 
 function force_push() {
-	git push origin $1 --force
+    read -p "  This will replace the remote history with yours! Are you sure? " -n 1 -r    
+    
+    output
+    output
+
+    if [[ $REPLY =~ ^[Yy]$ ]]
+    then
+      git push origin $1 --force
+    fi
 }
 
 function force_pull() {
-    pull $1
-    git reset --hard "origin/$1"
+    read -p "  This will replace your local history with remote one! Are you sure? " -n 1 -r    
+    
+    output
+    output
+
+    if [[ $REPLY =~ ^[Yy]$ ]]
+    then
+      pull $1
+      git reset --hard "origin/$1"
+    fi
 }
 
 function pull() {
