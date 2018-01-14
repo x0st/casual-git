@@ -91,13 +91,13 @@ function _find_and_switch_desired_branch() {
   local -a _all_branches=(`_all_git_branches`)
 
   # the user did not provide a name of a branch
-	if [[ -z ${_desired_branch} ]];
-	then
-	  return 1
-	fi
+  if [[ -z ${_desired_branch} ]];
+  then
+    return 1
+  fi
 
   # iterating over all branches and checking if any branch matches the desired one
-	for i in "${_all_branches[@]}"
+  for i in "${_all_branches[@]}"
   do
     # the desired branch is found and we can switch the branch instanly
     if [[ "${i}" == "${_desired_branch}" ]]; then
@@ -129,7 +129,7 @@ function _how_many_branches_match() {
   local -a _all_branches=(`_all_git_branches`)
 
  # iterating over all branches and checking if any branch matches the desired one
-	for i in "${_all_branches[@]}"
+  for i in "${_all_branches[@]}"
   do
     if [[ "${i}" =~ "${_desired_branch}" ]]; then
       ((_matching_branches_count++))
@@ -147,7 +147,7 @@ function _get_matching_branches() {
   local -a _matching_branches=()
 
   # iterating over all branches and checking if any branch matches the desired one
-	for i in "${_all_branches[@]}"
+  for i in "${_all_branches[@]}"
   do
     if [[ "${i}" =~ "${_desired_branch}" ]]; then
       _matching_branches=("${_matching_branches[@]}" "${i}")
@@ -159,7 +159,7 @@ function _get_matching_branches() {
 
 function _command_git_push() {
   _print_newline_message "Pushing..."
-	git push origin "`_current_branch`"
+  git push origin "`_current_branch`"
 }
 
 function _command_git_force_push() {
@@ -197,9 +197,9 @@ function _command_git_commit() {
   _print_empty_line
   _print_input_request_message "Enter a comment: "
 
-	read _comment
+  read _comment
 
-	git commit -m "${_comment}"
+  git commit -m "${_comment}"
 }
 
 function _command_git_amend_commit() {
@@ -207,123 +207,122 @@ function _command_git_amend_commit() {
 }
 
 function _command_git_smart_commit() {
-	local -a array_unstaged_files
-	local -a array_numbers
-	local -a array_staged_files
-    local -a str_git_status_file
-    local -a str_status
-    local -a str_file_path
-    local -a str_type
-    local -a int_i
-    local -a int_number
+  local -a array_unstaged_files
+  local -a array_numbers
+  local -a array_staged_files
+  local -a str_git_status_file
+  local -a str_status
+  local -a str_file_path
+  local -a str_type
+  local -a int_i
+  local -a int_number
 
-    int_i=0
+  int_i=0
 
-    output "Delete files from the next commit: "
+  output "Delete files from the next commit: "
 
-    # STAGED FILES
-	{ while IFS= read -r str_git_status_file;
-	do
-		[[ -z ${str_git_status_file} ]] && continue
+  # STAGED FILES
+  { while IFS= read -r str_git_status_file;
+  do
+    [[ -z ${str_git_status_file} ]] && continue
 
-		((int_i--))
-		str_status=$(echo ${str_git_status_file} | cut -c1-1)
-		str_file_path=$(echo "${str_git_status_file}" | sed -E 's/^.{0,3}//g')
+    ((int_i--))
+    str_status=$(echo ${str_git_status_file} | cut -c1-1)
+    str_file_path=$(echo "${str_git_status_file}" | sed -E 's/^.{0,3}//g')
 
-		array_staged_files+=("${str_file_path}")
+    array_staged_files+=("${str_file_path}")
 
+    case ${str_status} in
+        'M')
+            type='modified'
+            ;;
+        'D')
+            type='deleted '
+            ;;
+        'A')
+            type='new file'
+            ;;
+        'R')
+            type='renamed '
+            ;;
+        *)
+            type='unknown'
+            ;;
+    esac
 
-        case ${str_status} in
-            'M')
-                type='modified'
-                ;;
-            'D')
-                type='deleted '
-                ;;
-            'A')
-                type='new file'
-                ;;
-            'R')
-                type='renamed '
-                ;;
-            *)
-                type='unknown'
-                ;;
-        esac
+    output "[$int_i] \e[32m${type}: ${str_file_path}\e[0m"
 
-		output "[$int_i] \e[32m${type}: ${str_file_path}\e[0m"
+  done } <<< "$(git status -s | grep -E 'M. |D. |A. |R. ')"
 
-	done } <<< "$(git status -s | grep -E 'M. |D. |A. |R. ')"
+  [[ int_i -eq 0 ]] && output "\e[32mNo staged files\e[0m"
 
-    [[ int_i -eq 0 ]] && output "\e[32mNo staged files\e[0m"
+  int_i=0
 
-	int_i=0
+  output
+  output "Add files to the next commit: "
 
-    output
-    output "Add files to the next commit: "
+  # UNSTAGED FILES
+  { while IFS= read -r str_git_status_file;
+  do
+    [[ -z "${str_git_status_file}" ]] && continue
 
-    # UNSTAGED FILES
-	{ while IFS= read -r str_git_status_file;
-	do
-        [[ -z "${str_git_status_file}" ]] && continue
+    ((int_i++))
+    str_status=$(echo "${str_git_status_file}" | cut -c1-2)
+    str_file_path=$(echo "${str_git_status_file}" | sed -E 's/^.{0,3}//g')
 
-        ((int_i++))
-        str_status=$(echo "${str_git_status_file}" | cut -c1-2)
-        str_file_path=$(echo "${str_git_status_file}" | sed -E 's/^.{0,3}//g')
+    array_unstaged_files+=(${str_file_path})
 
-        array_unstaged_files+=(${str_file_path})
+    case "${str_status:1:1}" in
+      '?')
+        output "[${int_i}] \e[31muntracked:\e[0m ${str_file_path}"
+        ;;
+      'M')
+        output "[${int_i}] \e[34mmodified:\e[0m  ${str_file_path}"
+        ;;
+      'D')
+        output "[${int_i}] \e[37mdeleted:\e[0m   ${str_file_path}"
+      ;;
+    esac
+  done } <<< "$(git status -s | grep -E '\?\? |.M |.D ')"
 
-        case "${str_status:1:1}" in
-            '?')
-                output "[${int_i}] \e[31muntracked:\e[0m ${str_file_path}"
-                ;;
-            'M')
-            	output "[${int_i}] \e[34mmodified:\e[0m  ${str_file_path}"
-                ;;
-            'D')
-                output "[${int_i}] \e[37mdeleted:\e[0m   ${str_file_path}"
-                ;;
-        esac
-	done } <<< "$(git status -s | grep -E '\?\? |.M |.D ')"
+  [[ int_i -eq 0 ]] && output "\e[32mNo unstaged files\e[0m"
 
-    [[ int_i -eq 0 ]] && output "\e[32mNo unstaged files\e[0m"
+  output
+  output "Enter file numbers separating by spaces: " no
 
-    output
-    output "Enter file numbers separating by spaces: " no
+  read array_numbers
 
-    read array_numbers
+  array_numbers=($(echo ${array_numbers}))
 
-    array_numbers=($(echo ${array_numbers}))
-
-    # STAGING FILES
-    for int_number in "${array_numbers[@]}"
-    do
-        if [[ "$(echo ${int_number} | cut -c 1)" == '-' ]];
-        then
-            if [[ -n "${array_staged_files[$(($(echo ${int_number} | cut -c2-)-1))]}" ]];
-            then
-                git reset HEAD "${array_staged_files[$(($(echo ${int_number} | cut -c2-)-1))]}"
-            fi
-        else
-            if [[ -n "${array_unstaged_files[$((${int_number}-1))]}" ]];
-            then
-                git add "${array_unstaged_files[$((${int_number}-1))]}"
-            fi
-        fi
-    done
+  # STAGING FILES
+  for int_number in "${array_numbers[@]}"
+  do
+    if [[ "$(echo ${int_number} | cut -c 1)" == '-' ]];
+    then
+      if [[ -n "${array_staged_files[$(($(echo ${int_number} | cut -c2-)-1))]}" ]];
+      then
+          git reset HEAD "${array_staged_files[$(($(echo ${int_number} | cut -c2-)-1))]}"
+      fi
+    else
+      if [[ -n "${array_unstaged_files[$((${int_number}-1))]}" ]];
+      then
+          git add "${array_unstaged_files[$((${int_number}-1))]}"
+      fi
+    fi
+  done
 
     commit
 }
 
 function _command_git_smart_checkout() {
   local    _desired_branch_index
-	local    _desired_branch
-	local    _branch_counter=0
-	local -a _matching_branches
+  local    _desired_branch
+  local    _branch_counter=0
+  local -a _matching_branches
 
   # ask the user to input a name of a branch
-	_print_input_request_message "Enter a branch name or a part of name: "
-	read _desired_branch
+  _print_input_request_message "Enter a branch name or a part of name: "
+  read _desired_branch
   _print_empty_line
 
   # there is only one branch matching the desired branch
@@ -388,36 +387,36 @@ _show_usage
 _turn_off_user_input
 
 case `_ask_for_a_char` in
-	s|S)
-		_turn_on_user_input
-		_command_git_smart_commit
-		;;
-	l|L)
-		_command_git_pretty_log
-		;;
-	d|D)
-		_command_git_push
-		;;
-	f|F)
-		_command_git_force_push
-		;;
-	p|P)
-		_command_git_pull
-		;;
-	o|O)
-	  _command_git_force_pull
-		;;
-	c|C)
-		_turn_on_user_input
-		_command_git_commit
-		;;
-	a|A)
-		_command_git_amend_commit
-		;;
-	h|H)
-		_turn_on_user_input
-		_command_git_smart_checkout
-		;;
+  s|S)
+    _turn_on_user_input
+    _command_git_smart_commit
+    ;;
+  l|L)
+    _command_git_pretty_log
+    ;;
+  d|D)
+    _command_git_push
+    ;;
+  f|F)
+    _command_git_force_push
+    ;;
+  p|P)
+    _command_git_pull
+    ;;
+  o|O)
+    _command_git_force_pull
+    ;;
+  c|C)
+    _turn_on_user_input
+    _command_git_commit
+    ;;
+  a|A)
+    _command_git_amend_commit
+    ;;
+  h|H)
+    _turn_on_user_input
+    _command_git_smart_checkout
+    ;;
 esac
 
 _turn_on_user_input
