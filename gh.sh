@@ -1,60 +1,212 @@
 #!/bin/bash
 
-function git_push() {
-    output "Pushing..."
-	git push origin $1
+# Shows help to the user.
+function _show_usage() {
+    _print_empty_line
+    _print_newline_message "\033[1;31md \033[0m - push"
+    _print_newline_message "\033[1;31mf \033[0m - push --force"
+    _print_newline_message "\033[1;31mp \033[0m - pull"
+    _print_newline_message "\033[1;31mo \033[0m - pull --force"
+    _print_newline_message "\033[1;31mc \033[0m - commit"
+    _print_newline_message "\033[1;31ma \033[0m - commit --amend"
+    _print_newline_message "\033[1;31ms \033[0m - commit --smart"
+    _print_newline_message "\033[1;31ml \033[0m - log --pretty"
+    _print_newline_message "\033[1;31mh \033[0m - checkout --smart"
+    _print_empty_line
 }
 
-function force_push() {
-    read -p "  This will replace the remote history with yours! Are you sure? " -n 1 -r    
-    
-    output
-    output
+# Prints the current project's branch.
+function _current_branch() {
+  git rev-parse --abbrev-ref HEAD
+}
 
-    if [[ $REPLY =~ ^[Yy]$ ]]
-    then
-      git push origin $1 --force
+# User input is shown.
+function _turn_on_user_input() {
+  stty echo
+}
+
+# User input is not shown.
+function _turn_off_user_input() {
+  stty -echo
+}
+
+# Prints a message with a line break.
+function _print_newline_message() {
+  printf "  $1\n"
+}
+
+# Prints a message with no line break.
+function _print_input_request_message() {
+  printf "  $1"
+}
+
+# Prints a line break.
+function _print_empty_line() {
+  printf "\n"
+}
+
+# Asks the user to enter any character.
+function _ask_for_a_char() {
+  local _answer;
+
+  read -r -s -n 1 _answer
+
+  echo ${_answer}
+}
+
+# Asks the user for input 'y' or 'n'.
+function _ask_yes_or_no() {
+  local _message=${1}
+  local _reply
+
+  read -p "  ${_message} " -n 1 -r _reply
+
+  _print_empty_line
+  _print_empty_line
+
+  if [[ ${_reply} =~ ^[Yy]$ ]]
+  then
+    return 0
+  fi
+
+  return 1
+}
+
+# Prints all the local and remote branches received with 'git fetch --all'.
+function _all_git_branches() {
+  git branch -a \
+  | sed 's/^[[:space:]][[:space:]][[:alnum:]]*\/[[:alnum:]]*\///g' \
+  | sed '/HEAD -> [[:alnum:]/]*/d' \
+  | sed '/^* [[:alnum:]]*/d' \
+  | sed '/^[[:space:]][[:space:]][[:alnum:]]*/d'
+}
+
+# Accepts an approximate or exact name of a branch as first argument.
+# Tries to find a branch matching the provided one.
+# If only one branch matches the provided one then it is switched.
+function _find_and_switch_desired_branch() {
+  local _desired_branch=${1}
+  local _matching_branches_count=0
+  local _matching_branch
+  local -a _all_branches=(`_all_git_branches`)
+
+  # the user did not provide a name of a branch
+	if [[ -z ${_desired_branch} ]];
+	then
+	  return 1
+	fi
+
+  # iterating over all branches and checking if any branch matches the desired one
+	for i in "${_all_branches[@]}"
+  do
+    # the desired branch is found and we can switch the branch instanly
+    if [[ "${i}" == "${_desired_branch}" ]]; then
+      git checkout "${_desired_branch}"
+      return 0
     fi
-}
 
-function force_pull() {
-    read -p "  This will replace your local history with remote one! Are you sure? " -n 1 -r    
-    
-    output
-    output
-
-    if [[ $REPLY =~ ^[Yy]$ ]]
-    then
-      pull $1
-      git reset --hard "origin/$1"
+    # if there is no the exact name then matched names are written
+    if [[ "${i}" =~ "${_desired_branch}" ]]; then
+      ((_matching_branches_count++))
+      _matching_branch="${i}"
     fi
+  done
+
+  # if only one branche matched than we can switch
+  if [[ ${_matching_branches_count} -eq 1 ]]; then
+    git checkout "${_matching_branch}"
+    return 0
+  fi
+
+  return 1
 }
 
-function pull() {
-    output "Pulling..."
-	git pull origin $1
+# Accepts an approximate or exact name of a branch as first argument.
+# Counts the amount of the branches that match the provided one.
+function _how_many_branches_match() {
+  local _desired_branch=${1}
+  local _matching_branches_count=0
+  local -a _all_branches=(`_all_git_branches`)
+
+ # iterating over all branches and checking if any branch matches the desired one
+	for i in "${_all_branches[@]}"
+  do
+    if [[ "${i}" =~ "${_desired_branch}" ]]; then
+      ((_matching_branches_count++))
+    fi
+  done
+
+  echo ${_matching_branches_count}
 }
 
-function pretty_log() {
-	git log --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit
+# Accepts an approximate or exact name of a branch as first argument.
+# Finds the branches that match the provided one.
+function _get_matching_branches() {
+  local _desired_branch="${1}"
+  local -a _all_branches=(`_all_git_branches`)
+  local -a _matching_branches=()
+
+  # iterating over all branches and checking if any branch matches the desired one
+	for i in "${_all_branches[@]}"
+  do
+    if [[ "${i}" =~ "${_desired_branch}" ]]; then
+      _matching_branches=("${_matching_branches[@]}" "${i}")
+    fi
+  done
+
+  echo "${_matching_branches[@]}"
 }
 
-function commit() {
-    local -a comment
-
-    output
-	output "Enter a comment: " no
-
-	read comment
-
-	git commit -m "${comment}"
+function _command_git_push() {
+  _print_newline_message "Pushing..."
+	git push origin "`_current_branch`"
 }
 
-function amend_commit() {
-	git commit --amend --no-edit
+function _command_git_force_push() {
+  if `_ask_yes_or_no "This will replace the remote history with yours! Are you sure?"`
+  then
+    git push --force origin "`_current_branch`"
+  fi
 }
 
-function smart_commit() {
+function _command_git_force_pull() {
+  if `_ask_yes_or_no "This will replace your local history with remote one! Are you sure?"`
+  then
+    _print_newline_message "Pulling..."
+    git pull origin "`_current_branch`"
+    git reset --hard "origin/`_current_branch`"
+  fi
+}
+
+function _command_git_pull() {
+  _print_newline_message "Pulling..."
+  git pull origin "`_current_branch`"
+}
+
+function _command_git_pretty_log() {
+  git log \
+  --color \
+  --graph \
+  --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' \
+  --abbrev-commit
+}
+
+function _command_git_commit() {
+  local -a _comment
+
+  _print_empty_line
+  _print_input_request_message "Enter a comment: "
+
+	read _comment
+
+	git commit -m "${_comment}"
+}
+
+function _command_git_amend_commit() {
+  git commit --amend --no-edit
+}
+
+function _command_git_smart_commit() {
 	local -a array_unstaged_files
 	local -a array_numbers
 	local -a array_staged_files
@@ -163,63 +315,62 @@ function smart_commit() {
     commit
 }
 
-function smart_checkout() {
-	local -a str_desired_branch_name
-	local -a int_branch_num
-	local -a array_branch_list
-	local -a int_i
+function _command_git_smart_checkout() {
+  local    _desired_branch_index
+	local    _desired_branch
+	local    _branch_counter=0
+	local -a _matching_branches
 
-	output "Enter a branch name or a part of name: " no
+  # ask the user to input a name of a branch
+	_print_input_request_message "Enter a branch name or a part of name: "
+	read _desired_branch
+  _print_empty_line
 
-	read str_desired_branch_name
+  # there is only one branch matching the desired branch
+  if `_find_and_switch_desired_branch ${_desired_branch}`
+  then
+    return 0
+  fi
 
-    output ""
+  # there is more than one branch matching the desired branch
+  if [[ `_how_many_branches_match ${_desired_branch}` -gt 0 ]]; then
+    _print_newline_message "More than one git branch were found."
+    _print_newline_message "10 first branches are being shown."
+    _print_newline_message "Please choose a desired branch."
+    _print_empty_line
 
-	if [[ -z ${str_desired_branch_name} ]];
-	then
-	    return 1
-	fi
+    # all the branches that match the desired one
+    _matching_branches=(`_get_matching_branches ${_desired_branch}`)
 
-	if [[ -n "$(git show-ref refs/heads/${str_desired_branch_name})" ]];
-	then
-		git checkout ${str_desired_branch_name}
+    # printing all the branches that match the desired one
+    for branch in "${_matching_branches[@]}";
+    do
+      _print_newline_message "\033[1;31m[${_branch_counter}] "${branch}"\033[0m"
+      ((_branch_counter++))
+    done
 
-	elif [[ $(git branch | sed -E 's/^.{0,2}//g' | grep ${str_desired_branch_name} --color=no -c) -gt 0 ]];
-	then
-	    output "More than one git branch were found. \n  10 first branches are shown. \n  Please choose a desired branch. \n"
+    _print_empty_line
 
-	    array_branch_list=($(git branch | sed -E 's/^.{0,2}//g' | grep ${str_desired_branch_name} --color=no))
-        int_i=0
+    # ask the user to input a branch index
+    _desired_branch_index=`_ask_for_a_char`
 
-	    for branch in "${array_branch_list[@]:0:9}";
-	    do
-	        output "\033[1;31m[${int_i}] "${branch}"\033[0m"
-	        ((int_i++))
-	    done
+    # if the user entered a correct index
+    if [[ ${_desired_branch_index} =~ [0-9] ]];
+    then
+      # if the branch exists with the entered index
+      if [[ -n "${_matching_branches[${_desired_branch_index}]}" ]];
+      then
+        git checkout "${_matching_branches[${_desired_branch_index}]}"
+        return 0
+      else
+        return 1
+      fi
+    fi
+  fi
 
-	    output ""
+  _print_newline_message "There is no such branch."
 
-	    read -r -s -n 1 int_branch_num
-
-        if [[ ${int_branch_num} =~ [0-9] ]];
-        then
-            if [[ -n "${array_branch_list[${int_branch_num}]}" ]];
-            then
-                git checkout "${array_branch_list[$int_branch_num]}"
-            else
-                return 1
-            fi
-        fi
-
-	elif [ -z "$(git show-ref refs/heads/${str_desired_branch_name})" ];
-	then
-		output "There is no such a branch"
-		smart_checkout
-	fi
-}
-
-function get_current_branch() {
-    echo $(git rev-parse --abbrev-ref HEAD)
+  _command_git_smart_checkout
 }
 
 function output() {
@@ -233,63 +384,40 @@ function output() {
     printf "  $1$lb"
 }
 
-function show_usage() {
-    output
-    output "\033[1;31md \033[0m - push"
-    output "\033[1;31mf \033[0m - push --force"
-    output "\033[1;31mp \033[0m - pull"
-    output "\033[1;31mo \033[0m - pull --force"
-    output "\033[1;31mc \033[0m - commit"
-    output "\033[1;31ma \033[0m - commit --amend"
-    output "\033[1;31ms \033[0m - commit --smart"
-    output "\033[1;31ml \033[0m - log --pretty"
-    output "\033[1;31mh \033[0m - checkout --smart"
-    output
-}
+_show_usage
+_turn_off_user_input
 
-show_usage
-
-# waiting for a char and suppressing output
-read -r -s -n 1 answer
-
-# turn off any user input
-stty -echo
-
-case ${answer} in
-    # SMART COMMIT
+case `_ask_for_a_char` in
 	s|S)
-		stty echo
-		smart_commit
+		_turn_on_user_input
+		_command_git_smart_commit
 		;;
 	l|L)
-		pretty_log
+		_command_git_pretty_log
 		;;
 	d|D)
-		git_push $(get_current_branch)
+		_command_git_push
 		;;
 	f|F)
-		force_push $(get_current_branch)
+		_command_git_force_push
 		;;
 	p|P)
-		pull $(get_current_branch)
+		_command_git_pull
 		;;
 	o|O)
-	    force_pull $(get_current_branch)
+	  _command_git_force_pull
 		;;
 	c|C)
-		# turn on user input
-		stty echo
-		commit
+		_turn_on_user_input
+		_command_git_commit
 		;;
 	a|A)
-		amend_commit
+		_command_git_amend_commit
 		;;
 	h|H)
-		# turn on user input
-		stty echo
-		smart_checkout
+		_turn_on_user_input
+		_command_git_smart_checkout
 		;;
 esac
 
-# turn on user input
-stty echo
+_turn_on_user_input
