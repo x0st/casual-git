@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# Returns 1 if the provided string contains at least 1 space, 0 otherwise.
+function _string_contains_spaces {
+  [[ "$1" != "${1%[[:space:]]*}" ]] && return 0 || return 1
+}
+
 # Shows help to the user.
 function _show_usage() {
     _print_empty_line
@@ -157,6 +162,92 @@ function _get_matching_branches() {
   echo "${_matching_branches[@]}"
 }
 
+# Prints all staged files.
+# Approximate output:
+#
+# file1.txt:new_file
+# file2.txt:deleted
+# folder/:modified
+function _all_staged_files() {
+  local    _file_with_status
+  local    _git_file_status
+  local    _file_status
+  local -a _files
+  local -a _one_file
+
+  while IFS= read -r _file_with_status;
+  do
+    `_string_contains_spaces "$(echo "${_file_with_status}" | sed -E 's/^.{0,3}//g')"` && continue
+    [[ -z "${_file_with_status}" ]] && continue
+
+    _git_file_status="$(echo "${_file_with_status}" | cut -c1-1)"
+
+    case "${_git_file_status}" in
+      "M")
+        _file_status="modified"
+        ;;
+      "D")
+        _file_status="deleted"
+        ;;
+      "A")
+        _file_status="new_file"
+        ;;
+      "R")
+        _file_status="renamed"
+        ;;
+      *)
+        _file_status="unknown"
+        ;;
+    esac
+
+    _one_file="$(echo "${_file_with_status}" | sed -E 's/^.{0,3}//g'):${_file_status}"
+
+    _files=("${_files[@]}" "${_one_file}")
+  done <<< "$(git status -s | grep -E 'M. |D. |A. |R. ')"
+
+  echo "${_files[@]}"
+}
+
+# Prints all staged files.
+# Approximate output:
+#
+# file1.txt:untracked
+# file2.txt:modified
+# folder/:deleted
+function _all_unstaged_files() {
+  local    _file_with_status
+  local    _git_file_status
+  local    _file_status
+  local    _one_file
+  local -a _files
+
+  while IFS= read -r _file_with_status;
+  do
+    `_string_contains_spaces "$(echo "${_file_with_status}" | sed -E 's/^.{0,3}//g')"` && continue
+    [[ -z "${_file_with_status}" ]] && continue
+
+    _git_file_status=$(echo "${_file_with_status}" | cut -c1-2)
+
+    case "${_git_file_status:1:1}" in
+      '?')
+        _file_status="untracked"
+        ;;
+      'M')
+        _file_status="modified"
+        ;;
+      'D')
+        _file_status="deleted"
+        ;;
+    esac
+
+    _one_file="$(echo "${_file_with_status}" | sed -E 's/^.{0,3}//g'):${_file_status}"
+
+    _files=("${_files[@]}" "${_one_file}")
+  done <<< "$(git status -s | grep -E '\?\? |.M |.D ')"
+
+  echo "${_files[@]}"
+}
+
 function _command_git_push() {
   _print_newline_message "Pushing..."
   git push origin "`_current_branch`"
@@ -207,111 +298,100 @@ function _command_git_amend_commit() {
 }
 
 function _command_git_smart_commit() {
-  local -a array_unstaged_files
-  local -a array_numbers
-  local -a array_staged_files
-  local -a str_git_status_file
-  local -a str_status
-  local -a str_file_path
-  local -a str_type
-  local -a int_i
-  local -a int_number
+  local -ax _all_staged_files=(`_all_staged_files`)
+  local -ax _all_unstaged_files=(`_all_unstaged_files`)
+  local -ax _all_staged_and_unstaged_files=("${_all_staged_files[@]}" "${_all_unstaged_files[@]}")
+  local -x  _file_counter=0
+  local -ax _file_indexes=()
+  local     _file_indexes_user_input
+  local     _file_name
+  local     _file_status
 
-  int_i=0
+  # printing all staged files
+  _print_newline_message "Delete files from the next commit: "
 
-  output "Delete files from the next commit: "
-
-  # STAGED FILES
-  { while IFS= read -r str_git_status_file;
+  for file in "${_all_staged_files[@]}";
   do
-    [[ -z ${str_git_status_file} ]] && continue
+    ((_file_counter--))
 
-    ((int_i--))
-    str_status=$(echo ${str_git_status_file} | cut -c1-1)
-    str_file_path=$(echo "${str_git_status_file}" | sed -E 's/^.{0,3}//g')
+    _file_name="$(echo "${file}" | awk -F: '{OFS=":";$NF="";print $0;}')"
+    _file_name="${_file_name%?}"
 
-    array_staged_files+=("${str_file_path}")
+    _file_status="$(echo "${file}" | awk -F: '{print $NF}')"
 
-    case ${str_status} in
-        'M')
-            type='modified'
-            ;;
-        'D')
-            type='deleted '
-            ;;
-        'A')
-            type='new file'
-            ;;
-        'R')
-            type='renamed '
-            ;;
-        *)
-            type='unknown'
-            ;;
+    _print_newline_message "[${_file_counter}] \e[32m${_file_status}:   ${_file_name}\e[0m"
+  done
+
+  if [[ _file_counter -eq 0 ]];
+  then
+    _print_newline_message "\e[32mNo staged files\e[0m"
+  fi
+
+  # printing all unstaged files
+
+  _file_counter=0
+
+  _print_empty_line
+  _print_newline_message "Add files to the next commit: "
+
+  for file in "${_all_unstaged_files[@]}";
+  do
+    _file_name="$(echo "${file}" | sed -E 's/\[\[:space:\]\]/ /g' | awk -F: '{OFS=":";$NF="";print $0;}')"
+    _file_name="${_file_name%?}"
+
+    _file_status="$(echo "${file}" | awk -F: '{print $NF}')"
+
+    case "${_file_status}" in
+      "modified")
+        _print_newline_message "[${_file_counter}]  \e[34m${_file_status}\e[0m:   ${_file_name}"
+        ;;
+      "untracked")
+        _print_newline_message "[${_file_counter}] \e[31m${_file_status}\e[0m:   ${_file_name}"
+        ;;
+      "deleted")
+        _print_newline_message "[${_file_counter}]   \e[37m${_file_status}\e[0m:   ${_file_name}"
+        ;;
     esac
 
-    output "[$int_i] \e[32m${type}: ${str_file_path}\e[0m"
+    ((_file_counter++))
+  done
 
-  done } <<< "$(git status -s | grep -E 'M. |D. |A. |R. ')"
+  if [[ _file_counter -eq 0 ]];
+  then
+    _print_newline_message "\e[32mNo unstaged files\e[0m"
+  fi
 
-  [[ int_i -eq 0 ]] && output "\e[32mNo staged files\e[0m"
+  # asking the user to enter indexes of the files that should be deleted or added
+  _print_empty_line
+  _print_input_request_message "Enter file numbers separating by a space: "
+  read _file_indexes_user_input
 
-  int_i=0
+  _file_indexes=(`echo "${_file_indexes_user_input}"`)
 
-  output
-  output "Add files to the next commit: "
-
-  # UNSTAGED FILES
-  { while IFS= read -r str_git_status_file;
+  for index in "${_file_indexes[@]}";
   do
-    [[ -z "${str_git_status_file}" ]] && continue
-
-    ((int_i++))
-    str_status=$(echo "${str_git_status_file}" | cut -c1-2)
-    str_file_path=$(echo "${str_git_status_file}" | sed -E 's/^.{0,3}//g')
-
-    array_unstaged_files+=(${str_file_path})
-
-    case "${str_status:1:1}" in
-      '?')
-        output "[${int_i}] \e[31muntracked:\e[0m ${str_file_path}"
-        ;;
-      'M')
-        output "[${int_i}] \e[34mmodified:\e[0m  ${str_file_path}"
-        ;;
-      'D')
-        output "[${int_i}] \e[37mdeleted:\e[0m   ${str_file_path}"
-      ;;
-    esac
-  done } <<< "$(git status -s | grep -E '\?\? |.M |.D ')"
-
-  [[ int_i -eq 0 ]] && output "\e[32mNo unstaged files\e[0m"
-
-  output
-  output "Enter file numbers separating by spaces: " no
-
-  read array_numbers
-
-  array_numbers=($(echo ${array_numbers}))
-
-  # STAGING FILES
-  for int_number in "${array_numbers[@]}"
-  do
-    if [[ "$(echo ${int_number} | cut -c 1)" == '-' ]];
+    # delete a staged file from the next commit
+    if [[ "$(echo ${index} | cut -c 1)" == '-' ]];
     then
-      if [[ -n "${array_staged_files[$(($(echo ${int_number} | cut -c2-)-1))]}" ]];
+      if [[ -n "${_all_staged_files[$(($(echo ${index} | cut -c2-)-1))]}" ]];
       then
-          git reset HEAD "${array_staged_files[$(($(echo ${int_number} | cut -c2-)-1))]}"
+        _file_name="$(echo "${_all_staged_files[$(($(echo ${index} | cut -c2-)-1))]}" | awk -F: '{OFS=":";$NF="";print $0;}')"
+        _file_name="${_file_name%?}"
+
+        git reset HEAD "${_file_name}"
       fi
     else
-      if [[ -n "${array_unstaged_files[$((${int_number}-1))]}" ]];
+      if [[ -n "${_all_unstaged_files[${index}]}" ]];
       then
-          git add "${array_unstaged_files[$((${int_number}-1))]}"
+        _file_name="$(echo "${_all_unstaged_files[${index}]}" | awk -F: '{OFS=":";$NF="";print $0;}')"
+        _file_name="${_file_name%?}"
+
+        git add "${_file_name}"
       fi
     fi
   done
 
-    commit
+  _command_git_commit
 }
 
 function _command_git_smart_checkout() {
@@ -326,20 +406,20 @@ function _command_git_smart_checkout() {
   _print_empty_line
 
   # there is only one branch matching the desired branch
-  if `_find_and_switch_desired_branch ${_desired_branch}`
+  if `_find_and_switch_desired_branch "${_desired_branch}"`
   then
     return 0
   fi
 
   # there is more than one branch matching the desired branch
-  if [[ `_how_many_branches_match ${_desired_branch}` -gt 0 ]]; then
+  if [[ `_how_many_branches_match "${_desired_branch}"` -gt 0 ]]; then
     _print_newline_message "More than one git branch were found."
     _print_newline_message "10 first branches are being shown."
     _print_newline_message "Please choose a desired branch."
     _print_empty_line
 
     # all the branches that match the desired one
-    _matching_branches=(`_get_matching_branches ${_desired_branch}`)
+    _matching_branches=(`_get_matching_branches "${_desired_branch}"`)
 
     # printing all the branches that match the desired one
     for branch in "${_matching_branches[@]}";
