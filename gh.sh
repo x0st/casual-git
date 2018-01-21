@@ -106,7 +106,7 @@ function _find_and_switch_desired_branch() {
   do
     # the desired branch is found and we can switch the branch instanly
     if [[ "${i}" == "${_desired_branch}" ]]; then
-      git checkout "${_desired_branch}"
+      git checkout "${_desired_branch}" > /dev/null
       return 0
     fi
 
@@ -119,7 +119,7 @@ function _find_and_switch_desired_branch() {
 
   # if only one branche matched than we can switch
   if [[ ${_matching_branches_count} -eq 1 ]]; then
-    git checkout "${_matching_branch}"
+    git checkout "${_matching_branch}" > /dev/null
     return 0
   fi
 
