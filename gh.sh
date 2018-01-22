@@ -1,295 +1,491 @@
 #!/bin/bash
 
-function git_push() {
-    output "Pushing..."
-	git push origin $1
+# Returns 1 if the provided string contains at least 1 space, 0 otherwise.
+function _string_contains_spaces {
+  [[ "$1" != "${1%[[:space:]]*}" ]] && return 0 || return 1
 }
 
-function force_push() {
-    read -p "  This will replace the remote history with yours! Are you sure? " -n 1 -r    
-    
-    output
-    output
+# Shows help to the user.
+function _show_usage() {
+  _print_empty_line
+  _print_newline_message "\033[1;31md \033[0m - push"
+  _print_newline_message "\033[1;31mf \033[0m - push --force"
+  _print_newline_message "\033[1;31mp \033[0m - pull"
+  _print_newline_message "\033[1;31mo \033[0m - pull --force"
+  _print_newline_message "\033[1;31mc \033[0m - commit"
+  _print_newline_message "\033[1;31ma \033[0m - commit --amend"
+  _print_newline_message "\033[1;31ms \033[0m - commit --smart"
+  _print_newline_message "\033[1;31ml \033[0m - log --pretty"
+  _print_newline_message "\033[1;31mh \033[0m - checkout --smart"
+  _print_empty_line
+}
 
-    if [[ $REPLY =~ ^[Yy]$ ]]
-    then
-      git push origin $1 --force
+# Prints the current project's branch.
+function _current_branch() {
+  git rev-parse --abbrev-ref HEAD
+}
+
+# User input is shown.
+function _turn_on_user_input() {
+  stty echo
+}
+
+# User input is not shown.
+function _turn_off_user_input() {
+  stty -echo
+}
+
+# Prints a message with a line break.
+function _print_newline_message() {
+  printf "  $1\n"
+}
+
+# Prints a message with no line break.
+function _print_input_request_message() {
+  printf "  $1"
+}
+
+# Prints a line break.
+function _print_empty_line() {
+  printf "\n"
+}
+
+# Asks the user to enter any character.
+function _ask_for_a_char() {
+  local _answer;
+
+  read -r -s -n 1 _answer
+
+  echo ${_answer}
+}
+
+# Asks the user for input 'y' or 'n'.
+function _ask_yes_or_no() {
+  local _message=${1}
+  local _reply
+
+  read -p "  ${_message} " -n 1 -r _reply
+
+  _print_empty_line
+  _print_empty_line
+
+  if [[ ${_reply} =~ ^[Yy]$ ]]
+  then
+    return 0
+  fi
+
+  return 1
+}
+
+# Prints all the local and remote branches received with 'git fetch --all'.
+function _all_git_branches() {
+  git branch -a \
+  | sed 's/^[[:space:]][[:space:]][[:alnum:]]*\/[[:alnum:]]*\///g' \
+  | sed '/HEAD -> [[:alnum:]/]*/d' \
+  | sed '/^* [[:alnum:]]*/d' \
+  | sed '/^[[:space:]][[:space:]][[:alnum:]]*/d'
+}
+
+# Accepts an approximate or exact name of a branch as first argument.
+# Tries to find a branch matching the provided one.
+# If only one branch matches the provided one then it is switched.
+function _find_and_switch_desired_branch() {
+  local _desired_branch=${1}
+  local _matching_branches_count=0
+  local _matching_branch
+  local -a _all_branches=(`_all_git_branches`)
+
+  # the user did not provide a name of a branch
+  if [[ -z ${_desired_branch} ]];
+  then
+    return 1
+  fi
+
+  # iterating over all branches and checking if any branch matches the desired one
+  for i in "${_all_branches[@]}"
+  do
+    # the desired branch is found and we can switch the branch instanly
+    if [[ "${i}" == "${_desired_branch}" ]]; then
+      git checkout "${_desired_branch}" > /dev/null
+      return 0
     fi
-}
 
-function force_pull() {
-    read -p "  This will replace your local history with remote one! Are you sure? " -n 1 -r    
-    
-    output
-    output
-
-    if [[ $REPLY =~ ^[Yy]$ ]]
-    then
-      pull $1
-      git reset --hard "origin/$1"
+    # if there is no the exact name then matched names are written
+    if [[ "${i}" =~ "${_desired_branch}" ]]; then
+      ((_matching_branches_count++))
+      _matching_branch="${i}"
     fi
+  done
+
+  # if only one branche matched than we can switch
+  if [[ ${_matching_branches_count} -eq 1 ]]; then
+    git checkout "${_matching_branch}" > /dev/null
+    return 0
+  fi
+
+  return 1
 }
 
-function pull() {
-    output "Pulling..."
-	git pull origin $1
+# Accepts an approximate or exact name of a branch as first argument.
+# Counts the amount of the branches that match the provided one.
+function _how_many_branches_match() {
+  local _desired_branch=${1}
+  local _matching_branches_count=0
+  local -a _all_branches=(`_all_git_branches`)
+
+ # iterating over all branches and checking if any branch matches the desired one
+  for i in "${_all_branches[@]}"
+  do
+    if [[ "${i}" =~ "${_desired_branch}" ]]; then
+      ((_matching_branches_count++))
+    fi
+  done
+
+  echo ${_matching_branches_count}
 }
 
-function pretty_log() {
-	git log --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit
+# Accepts an approximate or exact name of a branch as first argument.
+# Finds the branches that match the provided one.
+function _get_matching_branches() {
+  local _desired_branch="${1}"
+  local -a _all_branches=(`_all_git_branches`)
+  local -a _matching_branches=()
+
+  # iterating over all branches and checking if any branch matches the desired one
+  for i in "${_all_branches[@]}"
+  do
+    if [[ "${i}" =~ "${_desired_branch}" ]]; then
+      _matching_branches=("${_matching_branches[@]}" "${i}")
+    fi
+  done
+
+  echo "${_matching_branches[@]}"
 }
 
-function commit() {
-    local -a comment
+# Prints all staged files.
+# Approximate output:
+#
+# file1.txt:new_file
+# file2.txt:deleted
+# folder/:modified
+function _all_staged_files() {
+  local    _file_with_status
+  local    _git_file_status
+  local    _file_status
+  local -a _files
+  local -a _one_file
 
-    output
-	output "Enter a comment: " no
+  while IFS= read -r _file_with_status;
+  do
+    `_string_contains_spaces "$(echo "${_file_with_status}" | sed -E 's/^.{0,3}//g')"` && continue
+    [[ -z "${_file_with_status}" ]] && continue
 
-	read comment
+    _git_file_status="$(echo "${_file_with_status}" | cut -c1-1)"
 
-	git commit -m "${comment}"
+    case "${_git_file_status}" in
+      "M")
+        _file_status="modified"
+        ;;
+      "D")
+        _file_status="deleted"
+        ;;
+      "A")
+        _file_status="new_file"
+        ;;
+      "R")
+        _file_status="renamed"
+        ;;
+      *)
+        _file_status="unknown"
+        ;;
+    esac
+
+    _one_file="$(echo "${_file_with_status}" | sed -E 's/^.{0,3}//g'):${_file_status}"
+
+    _files=("${_files[@]}" "${_one_file}")
+  done <<< "$(git status -s | grep -E 'M. |D. |A. |R. ')"
+
+  echo "${_files[@]}"
 }
 
-function amend_commit() {
-	git commit --amend --no-edit
+# Prints all staged files.
+# Approximate output:
+#
+# file1.txt:untracked
+# file2.txt:modified
+# folder/:deleted
+function _all_unstaged_files() {
+  local    _file_with_status
+  local    _git_file_status
+  local    _file_status
+  local    _one_file
+  local -a _files
+
+  while IFS= read -r _file_with_status;
+  do
+    `_string_contains_spaces "$(echo "${_file_with_status}" | sed -E 's/^.{0,3}//g')"` && continue
+    [[ -z "${_file_with_status}" ]] && continue
+
+    _git_file_status=$(echo "${_file_with_status}" | cut -c1-2)
+
+    case "${_git_file_status:1:1}" in
+      '?')
+        _file_status="untracked"
+        ;;
+      'M')
+        _file_status="modified"
+        ;;
+      'D')
+        _file_status="deleted"
+        ;;
+    esac
+
+    _one_file="$(echo "${_file_with_status}" | sed -E 's/^.{0,3}//g'):${_file_status}"
+
+    _files=("${_files[@]}" "${_one_file}")
+  done <<< "$(git status -s | grep -E '\?\? |.M |.D ')"
+
+  echo "${_files[@]}"
 }
 
-function smart_commit() {
-	local -a array_unstaged_files
-	local -a array_numbers
-	local -a array_staged_files
-    local -a str_git_status_file
-    local -a str_status
-    local -a str_file_path
-    local -a str_type
-    local -a int_i
-    local -a int_number
+function _command_git_push() {
+  _print_newline_message "Pushing..."
+  git push origin "`_current_branch`"
+}
 
-    int_i=0
+function _command_git_force_push() {
+  if `_ask_yes_or_no "This will replace the remote history with yours! Are you sure?"`
+  then
+    git push --force origin "`_current_branch`"
+  fi
+}
 
-    output "Delete files from the next commit: "
+function _command_git_force_pull() {
+  if `_ask_yes_or_no "This will replace your local history with remote one! Are you sure?"`
+  then
+    _print_newline_message "Pulling..."
+    git pull origin "`_current_branch`"
+    git reset --hard "origin/`_current_branch`"
+  fi
+}
 
-    # STAGED FILES
-	{ while IFS= read -r str_git_status_file;
-	do
-		[[ -z ${str_git_status_file} ]] && continue
+function _command_git_pull() {
+  _print_newline_message "Pulling..."
+  git pull origin "`_current_branch`"
+}
 
-		((int_i--))
-		str_status=$(echo ${str_git_status_file} | cut -c1-1)
-		str_file_path=$(echo "${str_git_status_file}" | sed -E 's/^.{0,3}//g')
+function _command_git_pretty_log() {
+  git log \
+  --color \
+  --graph \
+  --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' \
+  --abbrev-commit
+}
 
-		array_staged_files+=("${str_file_path}")
+function _command_git_commit() {
+  local -a _comment
 
+  _print_empty_line
+  _print_input_request_message "Enter a comment: "
 
-        case ${str_status} in
-            'M')
-                type='modified'
-                ;;
-            'D')
-                type='deleted '
-                ;;
-            'A')
-                type='new file'
-                ;;
-            'R')
-                type='renamed '
-                ;;
-            *)
-                type='unknown'
-                ;;
-        esac
+  read _comment
 
-		output "[$int_i] \e[32m${type}: ${str_file_path}\e[0m"
+  git commit -m "${_comment}"
+}
 
-	done } <<< "$(git status -s | grep -E 'M. |D. |A. |R. ')"
+function _command_git_amend_commit() {
+  git commit --amend --no-edit
+}
 
-    [[ int_i -eq 0 ]] && output "\e[32mNo staged files\e[0m"
+function _command_git_smart_commit() {
+  local -ax _all_staged_files=(`_all_staged_files`)
+  local -ax _all_unstaged_files=(`_all_unstaged_files`)
+  local -ax _all_staged_and_unstaged_files=("${_all_staged_files[@]}" "${_all_unstaged_files[@]}")
+  local -x  _file_counter=0
+  local -ax _file_indexes=()
+  local     _file_indexes_user_input
+  local     _file_name
+  local     _file_status
 
-	int_i=0
+  # printing all staged files
+  _print_newline_message "Delete files from the next commit: "
 
-    output
-    output "Add files to the next commit: "
+  for file in "${_all_staged_files[@]}";
+  do
+    ((_file_counter--))
 
-    # UNSTAGED FILES
-	{ while IFS= read -r str_git_status_file;
-	do
-        [[ -z "${str_git_status_file}" ]] && continue
+    _file_name="$(echo "${file}" | awk -F: '{OFS=":";$NF="";print $0;}')"
+    _file_name="${_file_name%?}"
 
-        ((int_i++))
-        str_status=$(echo "${str_git_status_file}" | cut -c1-2)
-        str_file_path=$(echo "${str_git_status_file}" | sed -E 's/^.{0,3}//g')
+    _file_status="$(echo "${file}" | awk -F: '{print $NF}')"
 
-        array_unstaged_files+=(${str_file_path})
+    _print_newline_message "[${_file_counter}] \e[32m${_file_status}:   ${_file_name}\e[0m"
+  done
 
-        case "${str_status:1:1}" in
-            '?')
-                output "[${int_i}] \e[31muntracked:\e[0m ${str_file_path}"
-                ;;
-            'M')
-            	output "[${int_i}] \e[34mmodified:\e[0m  ${str_file_path}"
-                ;;
-            'D')
-                output "[${int_i}] \e[37mdeleted:\e[0m   ${str_file_path}"
-                ;;
-        esac
-	done } <<< "$(git status -s | grep -E '\?\? |.M |.D ')"
+  if [[ _file_counter -eq 0 ]];
+  then
+    _print_newline_message "\e[32mNo staged files\e[0m"
+  fi
 
-    [[ int_i -eq 0 ]] && output "\e[32mNo unstaged files\e[0m"
+  # printing all unstaged files
 
-    output
-    output "Enter file numbers separating by spaces: " no
+  _file_counter=0
 
-    read array_numbers
+  _print_empty_line
+  _print_newline_message "Add files to the next commit: "
 
-    array_numbers=($(echo ${array_numbers}))
+  for file in "${_all_unstaged_files[@]}";
+  do
+    _file_name="$(echo "${file}" | sed -E 's/\[\[:space:\]\]/ /g' | awk -F: '{OFS=":";$NF="";print $0;}')"
+    _file_name="${_file_name%?}"
 
-    # STAGING FILES
-    for int_number in "${array_numbers[@]}"
+    _file_status="$(echo "${file}" | awk -F: '{print $NF}')"
+
+    case "${_file_status}" in
+      "modified")
+        _print_newline_message "[${_file_counter}]  \e[34m${_file_status}\e[0m:   ${_file_name}"
+        ;;
+      "untracked")
+        _print_newline_message "[${_file_counter}] \e[31m${_file_status}\e[0m:   ${_file_name}"
+        ;;
+      "deleted")
+        _print_newline_message "[${_file_counter}]   \e[37m${_file_status}\e[0m:   ${_file_name}"
+        ;;
+    esac
+
+    ((_file_counter++))
+  done
+
+  if [[ _file_counter -eq 0 ]];
+  then
+    _print_newline_message "\e[32mNo unstaged files\e[0m"
+  fi
+
+  # asking the user to enter indexes of the files that should be deleted or added
+  _print_empty_line
+  _print_input_request_message "Enter file numbers separating by a space: "
+  read _file_indexes_user_input
+
+  _file_indexes=(`echo "${_file_indexes_user_input}"`)
+
+  for index in "${_file_indexes[@]}";
+  do
+    # delete a staged file from the next commit
+    if [[ "$(echo ${index} | cut -c 1)" == '-' ]];
+    then
+      if [[ -n "${_all_staged_files[$(($(echo ${index} | cut -c2-)-1))]}" ]];
+      then
+        _file_name="$(echo "${_all_staged_files[$(($(echo ${index} | cut -c2-)-1))]}" | awk -F: '{OFS=":";$NF="";print $0;}')"
+        _file_name="${_file_name%?}"
+
+        git reset HEAD "${_file_name}"
+      fi
+    else
+      if [[ -n "${_all_unstaged_files[${index}]}" ]];
+      then
+        _file_name="$(echo "${_all_unstaged_files[${index}]}" | awk -F: '{OFS=":";$NF="";print $0;}')"
+        _file_name="${_file_name%?}"
+
+        git add "${_file_name}"
+      fi
+    fi
+  done
+
+  _command_git_commit
+}
+
+function _command_git_smart_checkout() {
+  local    _desired_branch_index
+  local    _desired_branch
+  local    _branch_counter=0
+  local -a _matching_branches
+
+  # ask the user to input a name of a branch
+  _print_input_request_message "Enter a branch name or a part of name: "
+  read _desired_branch
+  _print_empty_line
+
+  # there is only one branch matching the desired branch
+  if `_find_and_switch_desired_branch "${_desired_branch}"`
+  then
+    return 0
+  fi
+
+  # there is more than one branch matching the desired branch
+  if [[ `_how_many_branches_match "${_desired_branch}"` -gt 0 ]]; then
+    _print_newline_message "More than one git branch were found."
+    _print_newline_message "10 first branches are being shown."
+    _print_newline_message "Please choose a desired branch."
+    _print_empty_line
+
+    # all the branches that match the desired one
+    _matching_branches=(`_get_matching_branches "${_desired_branch}"`)
+
+    # printing all the branches that match the desired one
+    for branch in "${_matching_branches[@]}";
     do
-        if [[ "$(echo ${int_number} | cut -c 1)" == '-' ]];
-        then
-            if [[ -n "${array_staged_files[$(($(echo ${int_number} | cut -c2-)-1))]}" ]];
-            then
-                git reset HEAD "${array_staged_files[$(($(echo ${int_number} | cut -c2-)-1))]}"
-            fi
-        else
-            if [[ -n "${array_unstaged_files[$((${int_number}-1))]}" ]];
-            then
-                git add "${array_unstaged_files[$((${int_number}-1))]}"
-            fi
-        fi
+      _print_newline_message "\033[1;31m[${_branch_counter}] "${branch}"\033[0m"
+      ((_branch_counter++))
     done
 
-    commit
-}
+    _print_empty_line
 
-function smart_checkout() {
-	local -a str_desired_branch_name
-	local -a int_branch_num
-	local -a array_branch_list
-	local -a int_i
+    # ask the user to input a branch index
+    _desired_branch_index=`_ask_for_a_char`
 
-	output "Enter a branch name or a part of name: " no
-
-	read str_desired_branch_name
-
-    output ""
-
-	if [[ -z ${str_desired_branch_name} ]];
-	then
-	    return 1
-	fi
-
-	if [[ -n "$(git show-ref refs/heads/${str_desired_branch_name})" ]];
-	then
-		git checkout ${str_desired_branch_name}
-
-	elif [[ $(git branch | sed -E 's/^.{0,2}//g' | grep ${str_desired_branch_name} --color=no -c) -gt 0 ]];
-	then
-	    output "More than one git branch were found. \n  10 first branches are shown. \n  Please choose a desired branch. \n"
-
-	    array_branch_list=($(git branch | sed -E 's/^.{0,2}//g' | grep ${str_desired_branch_name} --color=no))
-        int_i=0
-
-	    for branch in "${array_branch_list[@]:0:9}";
-	    do
-	        output "\033[1;31m[${int_i}] "${branch}"\033[0m"
-	        ((int_i++))
-	    done
-
-	    output ""
-
-	    read -r -s -n 1 int_branch_num
-
-        if [[ ${int_branch_num} =~ [0-9] ]];
-        then
-            if [[ -n "${array_branch_list[${int_branch_num}]}" ]];
-            then
-                git checkout "${array_branch_list[$int_branch_num]}"
-            else
-                return 1
-            fi
-        fi
-
-	elif [ -z "$(git show-ref refs/heads/${str_desired_branch_name})" ];
-	then
-		output "There is no such a branch"
-		smart_checkout
-	fi
-}
-
-function get_current_branch() {
-    echo $(git rev-parse --abbrev-ref HEAD)
-}
-
-function output() {
-    local -a lb
-
-    if [[ $2 != 'no' ]];
+    # if the user entered a correct index
+    if [[ ${_desired_branch_index} =~ [0-9] ]];
     then
-        lb="\n"
+      # if the branch exists with the entered index
+      if [[ -n "${_matching_branches[${_desired_branch_index}]}" ]];
+      then
+        git checkout "${_matching_branches[${_desired_branch_index}]}"
+        return 0
+      else
+        return 1
+      fi
     fi
+  fi
 
-    printf "  $1$lb"
+  _print_newline_message "There is no such branch."
+
+  _command_git_smart_checkout
 }
 
-function show_usage() {
-    output
-    output "\033[1;31md \033[0m - push"
-    output "\033[1;31mf \033[0m - push --force"
-    output "\033[1;31mp \033[0m - pull"
-    output "\033[1;31mo \033[0m - pull --force"
-    output "\033[1;31mc \033[0m - commit"
-    output "\033[1;31ma \033[0m - commit --amend"
-    output "\033[1;31ms \033[0m - commit --smart"
-    output "\033[1;31ml \033[0m - log --pretty"
-    output "\033[1;31mh \033[0m - checkout --smart"
-    output
-}
+_show_usage
+_turn_off_user_input
 
-show_usage
-
-# waiting for a char and suppressing output
-read -r -s -n 1 answer
-
-# turn off any user input
-stty -echo
-
-case ${answer} in
-    # SMART COMMIT
-	s|S)
-		stty echo
-		smart_commit
-		;;
-	l|L)
-		pretty_log
-		;;
-	d|D)
-		git_push $(get_current_branch)
-		;;
-	f|F)
-		force_push $(get_current_branch)
-		;;
-	p|P)
-		pull $(get_current_branch)
-		;;
-	o|O)
-	    force_pull $(get_current_branch)
-		;;
-	c|C)
-		# turn on user input
-		stty echo
-		commit
-		;;
-	a|A)
-		amend_commit
-		;;
-	h|H)
-		# turn on user input
-		stty echo
-		smart_checkout
-		;;
+case `_ask_for_a_char` in
+  s|S)
+    _turn_on_user_input
+    _command_git_smart_commit
+    ;;
+  l|L)
+    _command_git_pretty_log
+    ;;
+  d|D)
+    _command_git_push
+    ;;
+  f|F)
+    _command_git_force_push
+    ;;
+  p|P)
+    _command_git_pull
+    ;;
+  o|O)
+    _command_git_force_pull
+    ;;
+  c|C)
+    _turn_on_user_input
+    _command_git_commit
+    ;;
+  a|A)
+    _command_git_amend_commit
+    ;;
+  h|H)
+    _turn_on_user_input
+    _command_git_smart_checkout
+    ;;
 esac
 
-# turn on user input
-stty echo
+_turn_on_user_input
