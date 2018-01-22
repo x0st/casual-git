@@ -7,17 +7,17 @@ function _string_contains_spaces {
 
 # Shows help to the user.
 function _show_usage() {
-    _print_empty_line
-    _print_newline_message "\033[1;31md \033[0m - push"
-    _print_newline_message "\033[1;31mf \033[0m - push --force"
-    _print_newline_message "\033[1;31mp \033[0m - pull"
-    _print_newline_message "\033[1;31mo \033[0m - pull --force"
-    _print_newline_message "\033[1;31mc \033[0m - commit"
-    _print_newline_message "\033[1;31ma \033[0m - commit --amend"
-    _print_newline_message "\033[1;31ms \033[0m - commit --smart"
-    _print_newline_message "\033[1;31ml \033[0m - log --pretty"
-    _print_newline_message "\033[1;31mh \033[0m - checkout --smart"
-    _print_empty_line
+  _print_empty_line
+  _print_newline_message "\033[1;31md \033[0m - push"
+  _print_newline_message "\033[1;31mf \033[0m - push --force"
+  _print_newline_message "\033[1;31mp \033[0m - pull"
+  _print_newline_message "\033[1;31mo \033[0m - pull --force"
+  _print_newline_message "\033[1;31mc \033[0m - commit"
+  _print_newline_message "\033[1;31ma \033[0m - commit --amend"
+  _print_newline_message "\033[1;31ms \033[0m - commit --smart"
+  _print_newline_message "\033[1;31ml \033[0m - log --pretty"
+  _print_newline_message "\033[1;31mh \033[0m - checkout --smart"
+  _print_empty_line
 }
 
 # Prints the current project's branch.
@@ -450,17 +450,6 @@ function _command_git_smart_checkout() {
   _print_newline_message "There is no such branch."
 
   _command_git_smart_checkout
-}
-
-function output() {
-    local -a lb
-
-    if [[ $2 != 'no' ]];
-    then
-        lb="\n"
-    fi
-
-    printf "  $1$lb"
 }
 
 _show_usage
