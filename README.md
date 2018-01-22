@@ -1,12 +1,13 @@
-# casual-git
+## What is that?
+*casual-git* is just a bash script that helps you to automate interaction with Git. It's a wrapper for Git.
 
-## How to install
-1. `git clone https://github.com/x0st/casual-git`
-2. `cd casual-git`
-3. `make`
-4. Use `gh` within git repositories to open the `casual-git`
+It can:
+- `git push` or `git pull` or `git log` or `git commit` or `git commit --amend --no-edit` by only pressing 4 keys
+- `git push --force` or `git pull` + `git reset --hard origin/HEAD` by only pressing 5 keys
+- switch to a branch if you only remember a part of the full name
+- switch to one of branches matching a pattern
+- make a commit  containing long file names with no need to enter them at all
 
-## Docs
 ```
   d  - push
   f  - push --force
@@ -19,30 +20,17 @@
   h  - checkout --smart
 ```
 
-### d (push)
-`git push origin {current_branch}`
+It is hardcoded to work with *origin* only .
 
-### f (push --force)
-`git push origin {current_branch} --force`
+## How to install
+1. `git clone https://github.com/x0st/casual-git`
+2. `cd casual-git`
+3. `make`
+4. Invoke the `gh` command within git repositories to open `casual-git`
 
-### p (pull)
-`git pull origin {current_branch}`
+## Some examples of usage
 
-### o (pull --force)
-```
-git pull origin {current_branch}
-git reset --hard "origin/{current_branch}"
-```
-
-### c (commit)
-You will be asked about a message.
-
-`git commit -m "{message}"`
-
-### a (commit --amend)
-`git commit --amend --no-edit`
-
-### s (commit --smart)
+### Smart commit
 ```
   d  - push
   f  - push --force
@@ -67,12 +55,7 @@ You will be asked about a message.
   Enter a comment: my commit
 ```
 
-### l (log --pretty)
-```
-git log --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit
-```
-
-### h (checkout --smart)
+### Smart branch switching
 ```
   d  - push
   f  - push --force
