@@ -426,6 +426,8 @@ function _command_git_smart_checkout() {
     do
       _print_newline_message "\033[1;31m[${_branch_counter}] "${branch}"\033[0m"
       ((_branch_counter++))
+
+      [[ ${_branch_counter} -ge 10 ]] && break
     done
 
     _print_empty_line
