@@ -1,12 +1,12 @@
 ## What is that?
-*casual-git* is just a bash script that helps you to automate interaction with Git. It's a wrapper for Git.
+*casual-git* is a bash script that helps you to automate interaction with Git. It's a wrapper for Git.
 
 It can:
 - `git push` or `git pull` or `git log` or `git commit` or `git commit --amend --no-edit` by only pressing 4 keys
 - `git push --force` or `git pull` + `git reset --hard origin/HEAD` by only pressing 5 keys
 - switch to a branch if you only remember a part of the full name
 - switch to one of branches matching a pattern
-- make a commit  containing long file names with no need to enter them at all
+- make a commit containing long file names with no need to enter them at all
 
 ```
   d  - push
