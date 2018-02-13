@@ -17,6 +17,7 @@ function _show_usage() {
   _print_newline_message "\033[1;31ms \033[0m - commit --smart"
   _print_newline_message "\033[1;31ml \033[0m - log --pretty"
   _print_newline_message "\033[1;31mh \033[0m - checkout --smart"
+  _print_newline_message "\033[1;31mm \033[0m - modify commit"
   _print_empty_line
 }
 
@@ -248,6 +249,10 @@ function _all_unstaged_files() {
   echo "${_files[@]}"
 }
 
+function _all_git_commits() {
+  git --no-pager log --pretty='%h:%s'
+}
+
 function _command_git_push() {
   _print_newline_message "Pushing..."
   git push origin "`_current_branch`"
@@ -395,9 +400,14 @@ function _command_git_smart_commit() {
 }
 
 function _command_git_smart_checkout() {
+  local    _user_choice_branch_counter=0
+  local    _top_branch_index
+  local    _bottom_branch_index
   local    _desired_branch_index
   local    _desired_branch
   local    _branch_counter=0
+  local -x _branches_per_page=10
+  local -x _page=1
   local -a _matching_branches
 
   # ask the user to input a name of a branch
@@ -414,6 +424,7 @@ function _command_git_smart_checkout() {
   # there is more than one branch matching the desired branch
   if [[ `_how_many_branches_match "${_desired_branch}"` -gt 0 ]]; then
     _print_newline_message "More than one git branch were found."
+    _print_newline_message "Use the s|S and w|W keys on your keyboard for pagination."
     _print_newline_message "10 first branches are being shown."
     _print_newline_message "Please choose a desired branch."
     _print_empty_line
@@ -421,35 +432,190 @@ function _command_git_smart_checkout() {
     # all the branches that match the desired one
     _matching_branches=(`_get_matching_branches "${_desired_branch}"`)
 
-    # printing all the branches that match the desired one
-    for branch in "${_matching_branches[@]}";
+    while [[ 1 -eq 1 ]];
     do
-      _print_newline_message "\033[1;31m[${_branch_counter}] "${branch}"\033[0m"
-      ((_branch_counter++))
-    done
+      _branch_counter=0
+      _user_choice_branch_counter=0
 
-    _print_empty_line
+      # printing all the branches that match the desired one
+      for branch in "${_matching_branches[@]}";
+      do
+        _bottom_branch_index=$(( ((${_page} - 1)) * ${_branches_per_page} ))
+        _top_branch_index=$(( ${_bottom_branch_index} + ${_branches_per_page} ))
 
-    # ask the user to input a branch index
-    _desired_branch_index=`_ask_for_a_char`
+        # if the current branch index is between the range of the page
+        if [[ ${_branch_counter} -ge ${_bottom_branch_index} && ${_branch_counter} -lt ${_top_branch_index} ]];
+        then
+          _print_newline_message "\033[1;31m[${_user_choice_branch_counter}] "${branch}"\033[0m"
+          ((_user_choice_branch_counter++))
+        fi
 
-    # if the user entered a correct index
-    if [[ ${_desired_branch_index} =~ [0-9] ]];
-    then
-      # if the branch exists with the entered index
-      if [[ -n "${_matching_branches[${_desired_branch_index}]}" ]];
+        ((_branch_counter++))
+      done
+
+      _print_empty_line
+
+      # ask the user to input a branch index
+      _desired_branch_index=`_ask_for_a_char`
+
+      # if the user entered a correct index
+      if [[ ${_desired_branch_index} =~ [0-9] ]];
       then
-        git checkout "${_matching_branches[${_desired_branch_index}]}"
-        return 0
+        # if the branch exists with the entered index
+        if [[ -n "${_matching_branches[${_desired_branch_index}]}" ]];
+        then
+          git checkout "${_matching_branches[$(( $(( ${_page} - 1 )) * ${_branches_per_page} + ${_desired_branch_index} ))]}"
+          return 0
+        else
+          return 1
+        fi
+      elif
+      # show the next page with branches
+      [[ ${_desired_branch_index} == "s" || ${_desired_branch_index} == "S" ]];
+      then
+        # incrementing the page's value
+        [[ $(( ${_page} * ${_branches_per_page} )) -lt ${#_matching_branches[@]} ]] && ((_page++))
+
+        if [[ ${#_matching_branches[@]} -gt ${_branches_per_page} ]];
+        then
+          tput cup $(($(tput lines) - 12)) 0
+          tput il 12
+        else
+          tput cup $(( $(tput lines) - $(( ${#_matching_branches[@]} + 2 )) )) 0
+          tput il $(( ${#_matching_branches[@]} + 2 ))
+        fi
+      elif
+      # show  the previous page with branches
+      [[ ${_desired_branch_index} == "w" || ${_desired_branch_index} == "W" ]];
+      then
+        # decrementing the page's value
+        [[ ${_page} -ne 1 ]] && ((_page--))
+
+        if [[ ${#_matching_branches[@]} -gt ${_branches_per_page} ]];
+        then
+          tput cup $(($(tput lines) - 12)) 0
+          tput il 12
+        else
+          tput cup $(( $(tput lines) - $(( ${#_matching_branches[@]} + 2 )) )) 0
+          tput il $(( ${#_matching_branches[@]} + 2 ))
+        fi
       else
-        return 1
+        break
       fi
-    fi
+    done
   fi
 
   _print_newline_message "There is no such branch."
 
   _command_git_smart_checkout
+}
+
+function _command_git_modify_commit() {
+  IFS=$'\n'
+  local -ax _all_commits=(`_all_git_commits`)
+  local     _top_commit_index
+  local     _bottom_commit_index
+  local     _desired_commit_index
+  local -x  _user_choice_commit_counter=0
+  local -x  _commit_counter=0
+  local -x  _commits_per_page=10
+  local -x  _page=1
+  local     _commit_hash
+  local     _commit_message
+  local     _commit_index_in_array
+  local     _old_git_sequence_editor
+
+  while [[ 1 -eq 1 ]];
+  do
+    _user_choice_commit_counter=0
+    _commit_counter=0
+
+    _bottom_commit_index=$(( ((${_page} - 1)) * ${_commits_per_page} ))
+    _top_commit_index=$(( ${_bottom_commit_index} + ${_commits_per_page} ))
+
+    for commit in "${_all_commits[@]}";
+    do
+      # if the current commit index is between the range of the page
+      if [[ ${_commit_counter} -ge ${_bottom_commit_index} && ${_commit_counter} -lt ${_top_commit_index} ]];
+      then
+        _commit_hash="$(echo ${commit} | awk -F ':' '{print $1}')"
+        _commit_message="$(echo ${commit} | awk -F ':' '{$1="";print $0}')"
+
+        _print_newline_message "[${_user_choice_commit_counter}] \033[31m"${_commit_hash}"\033[0m -"${_commit_message}""
+        ((_user_choice_commit_counter++))
+      else
+        [[ ${_commit_counter} -gt ${_top_commit_index} ]] && break
+      fi
+
+      ((_commit_counter++))
+    done
+
+    _print_empty_line
+
+    # ask the user to input a commit index
+    _turn_on_user_input
+    _desired_commit_index=`_ask_for_a_char`
+    _turn_off_user_input
+
+    # if the user entered a correct index
+    if [[ ${_desired_commit_index} =~ [0-9] ]];
+    then
+      _commit_index_in_array="$(( $(( ${_page} - 1 )) * ${_commits_per_page} + ${_desired_commit_index} ))"
+      # if a commit exists with the entered index
+      if [[ -n "${_all_commits[${_commit_index_in_array}]}" ]];
+      then
+        _commit_hash=$(echo ${_all_commits[${_commit_index_in_array}]} | awk -F ':' '{print $1}')
+
+        if [[ -z ${GIT_SEQUENCE_EDITOR} ]];
+        then
+          export GIT_SEQUENCE_EDITOR="casual-git-dummy-rebase-editor"
+          git rebase --interactive "${_commit_hash}^"
+          unset GIT_SEQUENCE_EDITOR
+        else
+          _old_git_sequence_editor=${GIT_SEQUENCE_EDITOR}
+          export GIT_SEQUENCE_EDITOR="casual-git-dummy-rebase-editor"
+          git rebase --interactive "${_commit_hash}^"
+          export GIT_SEQUENCE_EDITOR=${_old_git_sequence_editor}
+        fi
+
+        return 0
+      else
+        return 1
+      fi
+    elif
+    # show the next page with commites
+    [[ ${_desired_commit_index} == "s" || ${_desired_commit_index} == "S" ]];
+    then
+      # incrementing the page's value
+      [[ $(( ${_page} * ${_commits_per_page} )) -lt ${#_all_commits[@]} ]] && ((_page++))
+
+      if [[ ${#_all_commits[@]} -gt ${_commits_per_page} ]];
+      then
+        tput cup $(($(tput lines) - 12)) 0
+        tput il 12
+      else
+        tput cup $(( $(tput lines) - $(( ${#_all_commits[@]} + 2 )) )) 0
+        tput il $(( ${#_all_commits[@]} + 2 ))
+      fi
+    elif
+    # show  the previous page with commites
+    [[ ${_desired_commit_index} == "w" || ${_desired_commit_index} == "W" ]];
+    then
+      # decrementing the page's value
+      [[ ${_page} -ne 1 ]] && ((_page--))
+
+      if [[ ${#_all_commits[@]} -gt ${_commits_per_page} ]];
+      then
+        tput cup $(($(tput lines) - 12)) 0
+        tput il 12
+      else
+        tput cup $(( $(tput lines) - $(( ${#_all_commits[@]} + 2 )) )) 0
+        tput il $(( ${#_all_commits[@]} + 2 ))
+      fi
+    else
+      break
+    fi
+  done
 }
 
 _show_usage
@@ -486,6 +652,8 @@ case `_ask_for_a_char` in
     _turn_on_user_input
     _command_git_smart_checkout
     ;;
+  m|M)
+    _command_git_modify_commit
 esac
 
 _turn_on_user_input
