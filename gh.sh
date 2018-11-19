@@ -21,37 +21,37 @@ function _show_usage() {
   _print_empty_line
 }
 
-# Prints the current project's branch.
+# print the current project's branch.
 function _current_branch() {
   git rev-parse --abbrev-ref HEAD
 }
 
-# User input is shown.
+# make user input visible
 function _turn_on_user_input() {
   stty echo
 }
 
-# User input is not shown.
+# make user input unvisible
 function _turn_off_user_input() {
   stty -echo
 }
 
-# Prints a message with a line break.
+# print a message with a line break
 function _print_newline_message() {
   printf "  $1\n"
 }
 
-# Prints a message with no line break.
+# print a message with no line break
 function _print_input_request_message() {
   printf "  $1"
 }
 
-# Prints a line break.
+# print a line break
 function _print_empty_line() {
   printf "\n"
 }
 
-# Asks the user to enter any character.
+# ask the user to input a character
 function _ask_for_a_char() {
   local _answer;
 
@@ -60,7 +60,7 @@ function _ask_for_a_char() {
   echo ${_answer}
 }
 
-# Asks the user for input 'y' or 'n'.
+# ask the user to input 'y' or 'n'.
 function _ask_yes_or_no() {
   local _message=${1}
   local _reply
@@ -78,7 +78,7 @@ function _ask_yes_or_no() {
   return 1
 }
 
-# Prints all the local and remote branches received with 'git fetch --all'.
+# print all the local and remote branches received with 'git fetch --all'
 function _all_git_branches() {
   git branch -a \
   | sed 's/^[[:space:]][[:space:]][[:alnum:]]*\/[[:alnum:]]*\///g' \
@@ -87,9 +87,9 @@ function _all_git_branches() {
   | sed '/^[[:space:]][[:space:]][[:alnum:]]*/d'
 }
 
-# Accepts an approximate or exact name of a branch as first argument.
-# Tries to find a branch matching the provided one.
-# If only one branch matches the provided one then it is switched.
+# Accepts an approximate or the exact name of a branch as first argument.
+# Tries to find a branch that match the given one.
+# If only one branch matches the given one then it is switched.
 function _find_and_switch_desired_branch() {
   local _desired_branch=${1}
   local _matching_branches_count=0
@@ -110,23 +110,23 @@ function _find_and_switch_desired_branch() {
     return 0
   fi
 
-  # iterating over allthe  branches and checking if any branch matches the desired one
+  # iterating over all the branches and checking if any branch matches the desired one
   for i in "${_all_branches[@]}"
   do
-    # the desired branch is found and we can switch the branch instanly
+    # the desired branch has been found, so we can switch to it instanly
     if [[ "${i}" == "${_desired_branch}" ]]; then
       git checkout "${_desired_branch}" > /dev/null
       return 0
     fi
 
-    # if there is no the exact name then matched names are written
+    # if there is no exact name then the matched names are written
     if [[ "${i}" =~ "${_desired_branch}" ]]; then
       ((_matching_branches_count++))
       _matching_branch="${i}"
     fi
   done
 
-  # if only one branch matched than we can switch to it
+  # if only one branch matched, then switch to it
   if [[ ${_matching_branches_count} -eq 1 ]]; then
     git checkout "${_matching_branch}" > /dev/null
     return 0
@@ -135,14 +135,14 @@ function _find_and_switch_desired_branch() {
   return 1
 }
 
-# Accepts an approximate or exact name of a branch as first argument.
-# Counts the amount of the branches that match the provided one.
+# Accepts an approximate or the exact name of a branch as first argument.
+# Counts the amount of the branches that match the given one.
 function _how_many_branches_match() {
   local _desired_branch=${1}
   local _matching_branches_count=0
   local -a _all_branches=(`_all_git_branches`)
 
- # iterating over all branches and checking if any branch matches the desired one
+ # iterating over all the branches and checking if any branch matches the given one
   for i in "${_all_branches[@]}"
   do
     if [[ "${i}" =~ "${_desired_branch}" ]]; then
@@ -153,14 +153,14 @@ function _how_many_branches_match() {
   echo ${_matching_branches_count}
 }
 
-# Accepts an approximate or exact name of a branch as first argument.
-# Finds the branches that match the provided one.
+# Accepts an approximate or the exact name of a branch as first argument.
+# Finds the branches that match the given one.
 function _get_matching_branches() {
   local _desired_branch="${1}"
   local -a _all_branches=(`_all_git_branches`)
   local -a _matching_branches=()
 
-  # iterating over all branches and checking if any branch matches the desired one
+  # iterating over all then branches and checking if any branch matches the given one
   for i in "${_all_branches[@]}"
   do
     if [[ "${i}" =~ "${_desired_branch}" ]]; then
@@ -171,7 +171,7 @@ function _get_matching_branches() {
   echo "${_matching_branches[@]}"
 }
 
-# Prints all staged files.
+# Print all staged files
 # Approximate output:
 #
 # file1.txt:new_file
@@ -217,7 +217,7 @@ function _all_staged_files() {
   echo "${_files[@]}"
 }
 
-# Prints all staged files.
+# Print all staged files
 # Approximate output:
 #
 # file1.txt:untracked
@@ -320,7 +320,7 @@ function _command_git_smart_commit() {
   local     _file_name
   local     _file_status
 
-  # printing all staged files
+  # printing all the staged files
   _print_newline_message "Delete files from the next commit: "
 
   for file in "${_all_staged_files[@]}";
@@ -340,7 +340,7 @@ function _command_git_smart_commit() {
     _print_newline_message "\e[32mNo staged files\e[0m"
   fi
 
-  # printing all unstaged files
+  # printing all the unstaged files
 
   _file_counter=0
 
@@ -374,7 +374,7 @@ function _command_git_smart_commit() {
     _print_newline_message "\e[32mNo unstaged files\e[0m"
   fi
 
-  # asking the user to enter indexes of the files that should be deleted or added
+  # asking the user to input indexes of the files that should be deleted or added
   _print_empty_line
   _print_input_request_message "Enter file numbers separating by a space: "
   read _file_indexes_user_input
@@ -418,18 +418,18 @@ function _command_git_smart_checkout() {
   local -x _page=1
   local -a _matching_branches
 
-  # ask the user to input a name of a branch
+  # ask the user to input the name of a branch
   _print_input_request_message "Enter a branch name or a part of name: "
   read _desired_branch
   _print_empty_line
 
-  # there is only one branch matching the desired branch
+  # there is only one branch that match the desired one
   if `_find_and_switch_desired_branch "${_desired_branch}"`
   then
     return 0
   fi
 
-  # there is more than one branch matching the desired branch
+  # there is more than one branch that match the desired one
   if [[ `_how_many_branches_match "${_desired_branch}"` -gt 0 ]]; then
     _print_newline_message "More than one git branch were found."
     _print_newline_message "Use the s|S and w|W keys on your keyboard for pagination."
@@ -469,7 +469,7 @@ function _command_git_smart_checkout() {
       # if the user entered a correct index
       if [[ ${_desired_branch_index} =~ [0-9] ]];
       then
-        # if the branch exists with the entered index
+        # if the branch with the entered index exists
         if [[ -n "${_matching_branches[${_desired_branch_index}]}" ]];
         then
           git checkout "${_matching_branches[$(( $(( ${_page} - 1 )) * ${_branches_per_page} + ${_desired_branch_index} ))]}"
@@ -493,7 +493,7 @@ function _command_git_smart_checkout() {
           tput il $(( ${#_matching_branches[@]} + 2 ))
         fi
       elif
-      # show  the previous page with branches
+      # show the previous page with branches
       [[ ${_desired_branch_index} == "w" || ${_desired_branch_index} == "W" ]];
       then
         # decrementing the page's value
@@ -543,7 +543,7 @@ function _command_git_modify_commit() {
 
     for commit in "${_all_commits[@]}";
     do
-      # if the current commit index is between the range of the page
+      # if the current commit index is between the range
       if [[ ${_commit_counter} -ge ${_bottom_commit_index} && ${_commit_counter} -lt ${_top_commit_index} ]];
       then
         _commit_hash="$(echo ${commit} | awk -F ':' '{print $1}')"
@@ -569,7 +569,7 @@ function _command_git_modify_commit() {
     if [[ ${_desired_commit_index} =~ [0-9] ]];
     then
       _commit_index_in_array="$(( $(( ${_page} - 1 )) * ${_commits_per_page} + ${_desired_commit_index} ))"
-      # if a commit exists with the entered index
+      # if the commit with the entered index exists
       if [[ -n "${_all_commits[${_commit_index_in_array}]}" ]];
       then
         _commit_hash=$(echo ${_all_commits[${_commit_index_in_array}]} | awk -F ':' '{print $1}')
@@ -591,7 +591,7 @@ function _command_git_modify_commit() {
         return 1
       fi
     elif
-    # show the next page with commites
+    # show the next page
     [[ ${_desired_commit_index} == "s" || ${_desired_commit_index} == "S" ]];
     then
       # incrementing the page's value
@@ -606,7 +606,7 @@ function _command_git_modify_commit() {
         tput il $(( ${#_all_commits[@]} + 2 ))
       fi
     elif
-    # show  the previous page with commites
+    # show the previous page
     [[ ${_desired_commit_index} == "w" || ${_desired_commit_index} == "W" ]];
     then
       # decrementing the page's value
