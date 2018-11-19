@@ -102,6 +102,14 @@ function _find_and_switch_desired_branch() {
     return 1
   fi
 
+  # try to check if the given branch exists
+  git rev-parse --verify "${_desired_branch}" &> /dev/null
+  # the given branch exists, so switch to it
+  if [[ $? == 0 ]]; then
+    git checkout "${_desired_branch}" > /dev/null
+    return 0
+  fi
+
   # iterating over allthe  branches and checking if any branch matches the desired one
   for i in "${_all_branches[@]}"
   do
