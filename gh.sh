@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Returns 1 if the provided string contains at least 1 space, 0 otherwise.
+# return 1 if the given string contains at least 1 space, 0 otherwise.
 function _string_contains_spaces {
   [[ "$1" != "${1%[[:space:]]*}" ]] && return 0 || return 1
 }
 
-# Shows help to the user.
+# show help to the user
 function _show_usage() {
   _print_empty_line
   _print_newline_message "\033[1;31md \033[0m - push"
@@ -96,13 +96,13 @@ function _find_and_switch_desired_branch() {
   local _matching_branch
   local -a _all_branches=(`_all_git_branches`)
 
-  # the user did not provide a name of a branch
+  # the user did not provide the name of a branch
   if [[ -z ${_desired_branch} ]];
   then
     return 1
   fi
 
-  # iterating over all branches and checking if any branch matches the desired one
+  # iterating over allthe  branches and checking if any branch matches the desired one
   for i in "${_all_branches[@]}"
   do
     # the desired branch is found and we can switch the branch instanly
@@ -118,7 +118,7 @@ function _find_and_switch_desired_branch() {
     fi
   done
 
-  # if only one branche matched than we can switch
+  # if only one branch matched than we can switch to it
   if [[ ${_matching_branches_count} -eq 1 ]]; then
     git checkout "${_matching_branch}" > /dev/null
     return 0
