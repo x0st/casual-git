@@ -78,13 +78,55 @@ function _ask_yes_or_no() {
   return 1
 }
 
-# print all the local and remote branches received with 'git fetch --all'
+# return 1 in case the given remote exists, 0 otherwise
+function _remote_exists() {
+  local -a _all_remotes=(`git remote`)
+  local _given_remote=${1}
+
+  # iterating over all the existing remotes
+  for remote in "${_all_remotes[@]}"
+  do
+    if [[ "${remote}" == "${_given_remote}" ]]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+# retrieve a remote out of the name of a branch
+function _retrieve_remote() {
+  local _given_branch=${1}
+  local -a _slash_breakdown=(`echo ${_given_branch} | awk -F / '{for (i = 1; i < NF; i++) { print $i; }}'`)
+  local _possible_remote;
+
+  # no slashes have been found
+  if [[ ${#_slash_breakdown[@]} -eq 0 ]]; then
+    return 1
+  fi
+
+  for i in "${_slash_breakdown[@]}"
+  do
+    _possible_remote="${_possible_remote}${i}"
+
+    if `_remote_exists "${_possible_remote}"`
+    then
+      echo "${_possible_remote}"
+      return 0
+    fi
+
+    _possible_remote="${_possible_remote}/"
+  done
+
+  return 1
+}
+
+# print all the local and remote branches
 function _all_git_branches() {
-  git branch -a \
-  | sed 's/^[[:space:]][[:space:]][[:alnum:]]*\/[[:alnum:]]*\///g' \
-  | sed '/HEAD -> [[:alnum:]/]*/d' \
-  | sed '/^* [[:alnum:]]*/d' \
-  | sed '/^[[:space:]][[:space:]][[:alnum:]]*/d'
+  git branch -a --format="%(refname)" \
+  | sed 's/refs\/heads\///g' \
+  | sed 's/refs\/remotes\///g' \
+  | sed '/HEAD detached at/d'
 }
 
 # Accepts an approximate or the exact name of a branch as first argument.
@@ -94,6 +136,7 @@ function _find_and_switch_desired_branch() {
   local _desired_branch=${1}
   local _matching_branches_count=0
   local _matching_branch
+  local _remote
   local -a _all_branches=(`_all_git_branches`)
 
   # the user did not provide the name of a branch
@@ -102,18 +145,10 @@ function _find_and_switch_desired_branch() {
     return 1
   fi
 
-  # try to check if the given branch exists
-  git rev-parse --verify "${_desired_branch}" &> /dev/null
-  # the given branch exists, so switch to it
-  if [[ $? == 0 ]]; then
-    git checkout "${_desired_branch}" > /dev/null
-    return 0
-  fi
-
   # iterating over all the branches and checking if any branch matches the desired one
   for i in "${_all_branches[@]}"
   do
-    # the desired branch has been found, so we can switch to it instanly
+    # the desired branch has been found, so we can switch to it instantly
     if [[ "${i}" == "${_desired_branch}" ]]; then
       git checkout "${_desired_branch}" > /dev/null
       return 0
@@ -128,7 +163,14 @@ function _find_and_switch_desired_branch() {
 
   # if only one branch matched, then switch to it
   if [[ ${_matching_branches_count} -eq 1 ]]; then
-    git checkout "${_matching_branch}" > /dev/null
+    _remote="`_retrieve_remote "${_matching_branch}"`"
+
+    # if the matched branch contains a remote
+    if [[ $? -eq 0 ]]; then
+      git checkout "${_matching_branch:${#_remote}+1}" > /dev/null
+    else
+      git checkout "${_matching_branch}" > /dev/null
+    fi
     return 0
   fi
 
